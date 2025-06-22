@@ -1,0 +1,108 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+// WiFi credentials
+const char* ssid = "Unique CAFE";
+const char* password = "19nhieutu";
+
+// MQTT broker credentials
+const char* mqtt_server = "u1nebc.stackhero-network.com";
+const int mqtt_port = 3206;
+const char* mqtt_user = "energy-watch.dk";
+const char* mqtt_pass = "Toftebovej9C";
+
+// Topic to subscribe
+const char* subscribe_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_SCHEDULE_SETTING";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void connectToWiFi() {
+  Serial.print(" Connecting to WiFi");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n WiFi Connected");
+  Serial.print(" IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("\n Message received on topic:");
+  Serial.println(topic);
+
+  // Convert payload from byte[] to String
+  String msg;
+  for (unsigned int i = 0; i < length; i++) {
+    msg += (char)payload[i];
+  }
+  Serial.print(" Raw Payload: ");
+  Serial.println(msg);
+
+  // Parse JSON
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, msg);
+  if (error) {
+    Serial.print(" JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  // Extract values from JSON
+  float cooling_temp = doc["cooling_temp"];
+  float floor_heating_temp = doc["floor_heating_temp"];
+  bool heat_pump_status = doc["heat_pump_status"];
+  float heating_temp = doc["heating_temp"];
+  float hot_water_temp = doc["hot_water_temp"];
+  int schedule_hour = doc["schedule_hour"];
+  int schedule_minute = doc["schedule_minute"];
+  const char* repeat_mode = doc["schedule_repeat_mode"];
+  int working_mode = doc["working_mode"];
+
+  // Display values
+  Serial.println(" Parsed JSON values:");
+  Serial.print("   Cooling Temp: "); Serial.println(cooling_temp);
+  Serial.print("   Heating Temp: "); Serial.println(heating_temp);
+  Serial.print("   Hot Water Temp: "); Serial.println(hot_water_temp);
+  Serial.print("   Floor Heating Temp: "); Serial.println(floor_heating_temp);
+  Serial.print("   Schedule: "); Serial.print(schedule_hour); Serial.print(":"); Serial.println(schedule_minute);
+  Serial.print("   Repeat Mode: "); Serial.println(repeat_mode);
+  Serial.print("   Heat Pump Status: "); Serial.println(heat_pump_status ? "ON" : "OFF");
+  Serial.print("   Working Mode: "); Serial.println(working_mode);
+}
+
+void connectToMQTT() {
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(mqttCallback);
+
+  while (!client.connected()) {
+    Serial.print(" Connecting to MQTT broker...");
+    if (client.connect("ESP32Client", mqtt_user, mqtt_pass)) {
+      Serial.println(" Connected to MQTT");
+      client.subscribe(subscribe_topic);
+      Serial.print(" Subscribed to: ");
+      Serial.println(subscribe_topic);
+    } else {
+      Serial.print(" Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 2 seconds...");
+      delay(2000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  connectToWiFi();
+  connectToMQTT();
+}
+
+void loop() {
+  if (!client.connected()) {
+    connectToMQTT();
+  }
+  client.loop();
+}
