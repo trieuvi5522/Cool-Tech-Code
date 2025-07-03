@@ -10,7 +10,7 @@ const char* password = "19nhieutu";
 const char* mqtt_server = "u1nebc.stackhero-network.com";
 const int mqtt_port = 3206;
 const char* mqtt_user = "energy-watch.dk";
-const char* mqtt_pass = "Toftebovej9C";
+const char* mqtt_pass = "Amalievej6?";
 
 // Topic to subscribe
 const char* subscribe_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_SCHEDULE_SETTING";
