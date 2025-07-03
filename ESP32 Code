@@ -3,8 +3,8 @@
 #include <ArduinoJson.h>
 
 // WiFi credentials
-const char* ssid = "Unique CAFE";
-const char* password = "19nhieutu";
+const char* ssid = "SDIVN";
+const char* password = "Sdi@wireless228";
 
 // MQTT broker credentials
 const char* mqtt_server = "u1nebc.stackhero-network.com";
@@ -12,26 +12,36 @@ const int mqtt_port = 3206;
 const char* mqtt_user = "energy-watch.dk";
 const char* mqtt_pass = "Amalievej6?";
 
-// Topic to subscribe
+// MQTT topics
+const char* restart_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_RESTART";
 const char* subscribe_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_SCHEDULE_SETTING";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 void connectToWiFi() {
-  Serial.print(" Connecting to WiFi");
+  Serial.print("Connecting to WiFi");
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\n WiFi Connected");
-  Serial.print(" IP Address: ");
+  Serial.println("\nWiFi Connected");
+  Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 }
 
+void sendRestartPayload(bool value) {
+  String payload = value ? "true" : "false";
+  client.publish(restart_topic, payload.c_str(), false);
+  Serial.print("Đã gửi lên topic ");
+  Serial.print(restart_topic);
+  Serial.print(" với payload: ");
+  Serial.println(payload);
+}
+
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.println("\n Message received on topic:");
+  Serial.println("\nMessage received on topic:");
   Serial.println(topic);
 
   // Convert payload from byte[] to String
@@ -39,19 +49,19 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   for (unsigned int i = 0; i < length; i++) {
     msg += (char)payload[i];
   }
-  Serial.print(" Raw Payload: ");
+  Serial.print("Raw Payload: ");
   Serial.println(msg);
 
   // Parse JSON
   StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, msg);
   if (error) {
-    Serial.print(" JSON parsing failed: ");
+    Serial.print("JSON parsing failed: ");
     Serial.println(error.c_str());
     return;
   }
 
-  // Extract values from JSON
+  // Extract & display values
   float cooling_temp = doc["cooling_temp"];
   float floor_heating_temp = doc["floor_heating_temp"];
   bool heat_pump_status = doc["heat_pump_status"];
@@ -62,8 +72,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   const char* repeat_mode = doc["schedule_repeat_mode"];
   int working_mode = doc["working_mode"];
 
-  // Display values
-  Serial.println(" Parsed JSON values:");
+  Serial.println("Parsed JSON values:");
   Serial.print("   Cooling Temp: "); Serial.println(cooling_temp);
   Serial.print("   Heating Temp: "); Serial.println(heating_temp);
   Serial.print("   Hot Water Temp: "); Serial.println(hot_water_temp);
@@ -72,6 +81,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.print("   Repeat Mode: "); Serial.println(repeat_mode);
   Serial.print("   Heat Pump Status: "); Serial.println(heat_pump_status ? "ON" : "OFF");
   Serial.print("   Working Mode: "); Serial.println(working_mode);
+
+  // Nếu đúng topic downlink, gửi lại "false" lên topic /1_RESTART
+  if (String(topic) == subscribe_topic) {
+    sendRestartPayload(false);
+  }
 }
 
 void connectToMQTT() {
@@ -80,14 +94,14 @@ void connectToMQTT() {
   client.setBufferSize(512);
 
   while (!client.connected()) {
-    Serial.print(" Connecting to MQTT broker...");
+    Serial.print("Connecting to MQTT broker...");
     if (client.connect("ESP32Client", mqtt_user, mqtt_pass)) {
-      Serial.println(" Connected to MQTT");
+      Serial.println("Connected to MQTT");
       client.subscribe(subscribe_topic);
-      Serial.print(" Subscribed to: ");
+      Serial.print("Subscribed to: ");
       Serial.println(subscribe_topic);
     } else {
-      Serial.print(" Failed, rc=");
+      Serial.print("Failed, rc=");
       Serial.print(client.state());
       Serial.println(" retrying in 2 seconds...");
       delay(2000);
@@ -99,6 +113,8 @@ void setup() {
   Serial.begin(115200);
   connectToWiFi();
   connectToMQTT();
+  delay(1000); // Đợi ổn định kết nối
+  sendRestartPayload(true); // Gửi "true" khi khởi động
 }
 
 void loop() {
