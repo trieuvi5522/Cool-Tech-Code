@@ -13,8 +13,8 @@ const char* mqtt_user = "energy-watch.dk";
 const char* mqtt_pass = "Amalievej6?";
 
 // MQTT topics
-const char* restart_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_RESTART";
-const char* subscribe_topic = "dtck-pub/heat-pump-1/70694825-20a0-4099-a9b1-a1f1602a9566/1_SCHEDULE_SETTING";
+const char* restart_topic = "heat-pump-1/longdata/1_RESTART";
+const char* subscribe_topic = "heat-pump-1/longdata/1_SCHEDULE_SETTING";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
